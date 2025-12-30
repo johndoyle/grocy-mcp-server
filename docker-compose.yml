@@ -1,0 +1,29 @@
+services:
+  grocy:
+    image: linuxserver/grocy:latest
+    container_name: grocy
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+    volumes:
+      - ./grocy-data:/config
+    ports:
+      - "9283:80"
+    restart: unless-stopped
+
+  grocy-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: grocy-mcp-server
+    environment:
+      - GROCY_BASE_URL=http://grocy:80/api
+      - GROCY_API_KEY=${GROCY_API_KEY}
+    depends_on:
+      - grocy
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./src:/app/src
+    restart: unless-stopped
