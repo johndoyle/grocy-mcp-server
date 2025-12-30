@@ -176,6 +176,57 @@ class GrocyMCPServer {
           description: "Get all storage locations",
           inputSchema: { type: "object", properties: {} },
         },
+
+        // Generic Entity Management (CRUD)
+        {
+          name: "create_entity",
+          description: "Create a new entity (product, location, recipe, chore, task, etc.)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              entity: { type: "string", description: "Entity type (e.g., 'products', 'locations', 'recipes', 'chores', 'tasks', 'batteries', 'quantity_units', 'shopping_locations')" },
+              data: { type: "object", description: "Entity data as JSON object" },
+            },
+            required: ["entity", "data"],
+          },
+        },
+        {
+          name: "update_entity",
+          description: "Update an existing entity",
+          inputSchema: {
+            type: "object",
+            properties: {
+              entity: { type: "string", description: "Entity type (e.g., 'products', 'locations', 'recipes', 'chores')" },
+              object_id: { type: "number", description: "Entity ID to update" },
+              data: { type: "object", description: "Updated entity data as JSON object" },
+            },
+            required: ["entity", "object_id", "data"],
+          },
+        },
+        {
+          name: "delete_entity",
+          description: "Delete an entity",
+          inputSchema: {
+            type: "object",
+            properties: {
+              entity: { type: "string", description: "Entity type (e.g., 'products', 'locations', 'recipes')" },
+              object_id: { type: "number", description: "Entity ID to delete" },
+            },
+            required: ["entity", "object_id"],
+          },
+        },
+        {
+          name: "get_entity",
+          description: "Get a specific entity by ID",
+          inputSchema: {
+            type: "object",
+            properties: {
+              entity: { type: "string", description: "Entity type (e.g., 'products', 'locations', 'recipes')" },
+              object_id: { type: "number", description: "Entity ID" },
+            },
+            required: ["entity", "object_id"],
+          },
+        },
         
         // Shopping List
         {
@@ -185,24 +236,25 @@ class GrocyMCPServer {
         },
         {
           name: "add_to_shopping_list",
-          description: "Add a product to shopping list",
+          description: "Add a product to shopping list with specified quantity",
           inputSchema: {
             type: "object",
             properties: {
               product_id: { type: "number", description: "Product ID to add" },
-              amount: { type: "number", description: "Amount to add (default: 1)" },
+              amount: { type: "number", description: "Quantity to add (default: 1)" },
+              note: { type: "string", description: "Optional note for this item" },
             },
             required: ["product_id"],
           },
         },
         {
           name: "remove_from_shopping_list",
-          description: "Remove a product from shopping list",
+          description: "Remove a product from shopping list or reduce its quantity",
           inputSchema: {
             type: "object",
             properties: {
               product_id: { type: "number", description: "Product ID to remove" },
-              amount: { type: "number", description: "Amount to remove (default: 1)" },
+              amount: { type: "number", description: "Quantity to remove (default: removes all)" },
             },
             required: ["product_id"],
           },
@@ -359,6 +411,117 @@ class GrocyMCPServer {
             required: ["entity", "object_id"],
           },
         },
+
+        // Bulk Operations & Smart Tools
+        {
+          name: "create_recipe_with_ingredients",
+          description: "Create a complete recipe with all ingredients in a single operation",
+          inputSchema: {
+            type: "object",
+            properties: {
+              recipe: {
+                type: "object",
+                description: "Recipe data (name, description, etc.)",
+                properties: {
+                  name: { type: "string", description: "Recipe name" },
+                  description: { type: "string", description: "Recipe description/instructions" },
+                  base_servings: { type: "number", description: "Base servings (default: 1)" },
+                },
+                required: ["name"],
+              },
+              ingredients: {
+                type: "array",
+                description: "Array of ingredients",
+                items: {
+                  type: "object",
+                  properties: {
+                    product_id: { type: "number", description: "Product ID" },
+                    amount: { type: "number", description: "Amount needed" },
+                    note: { type: "string", description: "Optional note" },
+                    only_check_single_unit_in_stock: { type: "boolean", description: "Check single unit only" },
+                  },
+                  required: ["product_id", "amount"],
+                },
+              },
+            },
+            required: ["recipe", "ingredients"],
+          },
+        },
+        {
+          name: "add_recipe_missing_to_shopping_list",
+          description: "Check what ingredients are missing for a recipe and add them to shopping list",
+          inputSchema: {
+            type: "object",
+            properties: {
+              recipe_id: { type: "number", description: "Recipe ID" },
+              servings: { type: "number", description: "Number of servings to calculate for (optional)" },
+            },
+            required: ["recipe_id"],
+          },
+        },
+        {
+          name: "match_product_by_name",
+          description: "Find products by name with fuzzy matching and confidence scores",
+          inputSchema: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Product name to search for" },
+              fuzzy: { type: "boolean", description: "Enable fuzzy matching (default: true)" },
+              limit: { type: "number", description: "Maximum results to return (default: 5)" },
+            },
+            required: ["name"],
+          },
+        },
+        {
+          name: "bulk_get_stock",
+          description: "Get stock levels for multiple products in a single call",
+          inputSchema: {
+            type: "object",
+            properties: {
+              product_ids: {
+                type: "array",
+                items: { type: "number" },
+                description: "Array of product IDs to check",
+              },
+            },
+            required: ["product_ids"],
+          },
+        },
+        {
+          name: "get_recipe_with_stock_status",
+          description: "Get recipe details with current stock status for all ingredients",
+          inputSchema: {
+            type: "object",
+            properties: {
+              recipe_id: { type: "number", description: "Recipe ID" },
+              servings: { type: "number", description: "Calculate for specific servings (optional)" },
+            },
+            required: ["recipe_id"],
+          },
+        },
+        {
+          name: "bulk_add_to_shopping_list",
+          description: "Add multiple products to shopping list in one operation",
+          inputSchema: {
+            type: "object",
+            properties: {
+              items: {
+                type: "array",
+                description: "Array of items to add",
+                items: {
+                  type: "object",
+                  properties: {
+                    product_id: { type: "number", description: "Product ID" },
+                    amount: { type: "number", description: "Quantity" },
+                    note: { type: "string", description: "Optional note" },
+                  },
+                  required: ["product_id", "amount"],
+                },
+              },
+            },
+            required: ["items"],
+          },
+        },
       ],
     }));
 
@@ -509,6 +672,48 @@ class GrocyMCPServer {
             };
           }
 
+          // Generic Entity Management (CRUD)
+          case "create_entity": {
+            const entity = args.entity as string;
+            const data = args.data as object;
+            
+            const response = await this.axiosInstance.post(`/objects/${entity}`, data);
+            return {
+              content: [{ type: "text", text: `Successfully created ${entity} with ID: ${response.data.created_object_id}\n${JSON.stringify(response.data, null, 2)}` }],
+            };
+          }
+
+          case "update_entity": {
+            const entity = args.entity as string;
+            const objectId = args.object_id as number;
+            const data = args.data as object;
+            
+            await this.axiosInstance.put(`/objects/${entity}/${objectId}`, data);
+            return {
+              content: [{ type: "text", text: `Successfully updated ${entity} ${objectId}` }],
+            };
+          }
+
+          case "delete_entity": {
+            const entity = args.entity as string;
+            const objectId = args.object_id as number;
+            
+            await this.axiosInstance.delete(`/objects/${entity}/${objectId}`);
+            return {
+              content: [{ type: "text", text: `Successfully deleted ${entity} ${objectId}` }],
+            };
+          }
+
+          case "get_entity": {
+            const entity = args.entity as string;
+            const objectId = args.object_id as number;
+            
+            const response = await this.axiosInstance.get(`/objects/${entity}/${objectId}`);
+            return {
+              content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }],
+            };
+          }
+
           // Shopping List
           case "get_shopping_list": {
             const response = await this.axiosInstance.get("/objects/shopping_list");
@@ -520,11 +725,20 @@ class GrocyMCPServer {
           case "add_to_shopping_list": {
             const productId = args.product_id as number;
             const amount = (args.amount as number) || 1;
+            const note = args.note as string | undefined;
             
-            const data = { product_id: productId, amount: amount };
-            await this.axiosInstance.post("/stock/shoppinglist/add-product", data);
+            // Use direct objects API instead of /stock/shoppinglist/add-product
+            // as that endpoint ignores the amount parameter
+            const data: any = {
+              product_id: productId,
+              shopping_list_id: 1,
+              amount: amount
+            };
+            if (note) data.note = note;
+            
+            const response = await this.axiosInstance.post(`/objects/shopping_list`, data);
             return {
-              content: [{ type: "text", text: `Successfully added product ${productId} to shopping list` }],
+              content: [{ type: "text", text: `Successfully added ${amount} unit(s) of product ${productId} to shopping list (entry ID: ${response.data.created_object_id})` }],
             };
           }
 
@@ -532,11 +746,31 @@ class GrocyMCPServer {
             const productId = args.product_id as number;
             const amount = (args.amount as number) || 1;
             
-            const data = { product_id: productId, amount: amount };
-            await this.axiosInstance.post("/stock/shoppinglist/remove-product", data);
-            return {
-              content: [{ type: "text", text: `Successfully removed product ${productId} from shopping list` }],
-            };
+            // First find the shopping list entry for this product
+            const listResponse = await this.axiosInstance.get(`/objects/shopping_list`);
+            const entries = listResponse.data.filter((e: any) => e.product_id === productId);
+            
+            if (entries.length === 0) {
+              return {
+                content: [{ type: "text", text: `Product ${productId} not found on shopping list` }],
+              };
+            }
+            
+            // Update or delete the first matching entry
+            const entry = entries[0];
+            const newAmount = entry.amount - amount;
+            
+            if (newAmount <= 0) {
+              await this.axiosInstance.delete(`/objects/shopping_list/${entry.id}`);
+              return {
+                content: [{ type: "text", text: `Successfully removed product ${productId} from shopping list` }],
+              };
+            } else {
+              await this.axiosInstance.put(`/objects/shopping_list/${entry.id}`, { amount: newAmount });
+              return {
+                content: [{ type: "text", text: `Successfully reduced product ${productId} to ${newAmount} unit(s) on shopping list` }],
+              };
+            }
           }
 
           case "add_missing_products_to_shopping_list": {
@@ -680,6 +914,305 @@ class GrocyMCPServer {
             const response = await this.axiosInstance.get(`/userfields/${entity}/${objectId}`);
             return {
               content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }],
+            };
+          }
+
+          // Bulk Operations & Smart Tools
+          case "create_recipe_with_ingredients": {
+            const recipeData = args.recipe as any;
+            const ingredients = args.ingredients as any[];
+            
+            // Create the recipe first
+            const recipePayload: any = {
+              name: recipeData.name,
+              description: recipeData.description || "",
+              base_servings: recipeData.base_servings || 1,
+            };
+            
+            const recipeResponse = await this.axiosInstance.post("/objects/recipes", recipePayload);
+            const recipeId = recipeResponse.data.created_object_id;
+            
+            // Add all ingredients
+            const ingredientResults: any[] = [];
+            for (const ingredient of ingredients) {
+              try {
+                const ingredientPayload = {
+                  recipe_id: recipeId,
+                  product_id: ingredient.product_id,
+                  amount: ingredient.amount,
+                  note: ingredient.note || "",
+                  only_check_single_unit_in_stock: ingredient.only_check_single_unit_in_stock || false,
+                };
+                await this.axiosInstance.post("/objects/recipes_pos", ingredientPayload);
+                ingredientResults.push({ product_id: ingredient.product_id, status: "added" });
+              } catch (err: any) {
+                ingredientResults.push({ product_id: ingredient.product_id, status: "failed", error: err.message });
+              }
+            }
+            
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  recipe_id: recipeId,
+                  recipe_name: recipeData.name,
+                  ingredients_added: ingredientResults.filter(i => i.status === "added").length,
+                  ingredients_failed: ingredientResults.filter(i => i.status === "failed").length,
+                  details: ingredientResults,
+                }, null, 2),
+              }],
+            };
+          }
+
+          case "add_recipe_missing_to_shopping_list": {
+            const recipeId = args.recipe_id as number;
+            const servings = (args.servings as number) || 1;
+            
+            // Get recipe fulfillment status
+            const fulfillmentResponse = await this.axiosInstance.get(`/recipes/${recipeId}/fulfillment`);
+            const fulfillment = fulfillmentResponse.data;
+            
+            // Get recipe ingredients
+            const ingredientsResponse = await this.axiosInstance.get("/objects/recipes_pos");
+            const recipeIngredients = ingredientsResponse.data.filter((i: any) => i.recipe_id === recipeId);
+            
+            // Get current stock
+            const stockResponse = await this.axiosInstance.get("/stock");
+            const stockMap = new Map(stockResponse.data.map((s: any) => [s.product_id, s.amount_aggregated]));
+            
+            const addedItems: any[] = [];
+            for (const ingredient of recipeIngredients) {
+              const neededAmount = ingredient.amount * servings;
+              const stockAmount = (stockMap.get(ingredient.product_id) as number) || 0;
+              const missingAmount = Math.max(0, neededAmount - stockAmount);
+              
+              if (missingAmount > 0) {
+                try {
+                  await this.axiosInstance.post("/objects/shopping_list", {
+                    product_id: ingredient.product_id,
+                    shopping_list_id: 1,
+                    amount: missingAmount,
+                    note: `For recipe (${servings} servings)`,
+                  });
+                  addedItems.push({
+                    product_id: ingredient.product_id,
+                    needed: neededAmount,
+                    in_stock: stockAmount,
+                    added_to_list: missingAmount,
+                  });
+                } catch (err: any) {
+                  addedItems.push({
+                    product_id: ingredient.product_id,
+                    error: err.message,
+                  });
+                }
+              }
+            }
+            
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  recipe_id: recipeId,
+                  servings: servings,
+                  items_added: addedItems.length,
+                  details: addedItems,
+                }, null, 2),
+              }],
+            };
+          }
+
+          case "match_product_by_name": {
+            const searchName = (args.name as string).toLowerCase();
+            const fuzzy = args.fuzzy !== false; // default true
+            const limit = (args.limit as number) || 5;
+            
+            const response = await this.axiosInstance.get("/objects/products");
+            const products = response.data;
+            
+            // Calculate match scores
+            const scored = products.map((p: any) => {
+              const productName = p.name.toLowerCase();
+              let score = 0;
+              let matchType = "none";
+              
+              if (productName === searchName) {
+                score = 100;
+                matchType = "exact";
+              } else if (productName.includes(searchName) || searchName.includes(productName)) {
+                score = 80;
+                matchType = "contains";
+              } else if (fuzzy) {
+                // Simple fuzzy: check word overlap
+                const searchWords = searchName.split(/\s+/);
+                const productWords = productName.split(/\s+/);
+                const matchingWords = searchWords.filter((sw: string) => 
+                  productWords.some((pw: string) => pw.includes(sw) || sw.includes(pw))
+                );
+                score = Math.round((matchingWords.length / Math.max(searchWords.length, 1)) * 60);
+                if (score > 0) matchType = "fuzzy";
+              }
+              
+              return { ...p, match_score: score, match_type: matchType };
+            });
+            
+            // Filter and sort
+            const matches = scored
+              .filter((p: any) => p.match_score > 0)
+              .sort((a: any, b: any) => b.match_score - a.match_score)
+              .slice(0, limit);
+            
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  query: args.name,
+                  matches_found: matches.length,
+                  results: matches.map((m: any) => ({
+                    id: m.id,
+                    name: m.name,
+                    match_score: m.match_score,
+                    match_type: m.match_type,
+                  })),
+                }, null, 2),
+              }],
+            };
+          }
+
+          case "bulk_get_stock": {
+            const productIds = args.product_ids as number[];
+            
+            // Get all stock at once
+            const stockResponse = await this.axiosInstance.get("/stock");
+            const stockMap = new Map(stockResponse.data.map((s: any) => [s.product_id, s]));
+            
+            const results = productIds.map(id => {
+              const stock = stockMap.get(id) as any;
+              if (stock) {
+                return {
+                  product_id: id,
+                  product_name: stock.product?.name || "Unknown",
+                  amount: stock.amount,
+                  amount_aggregated: stock.amount_aggregated,
+                  best_before_date: stock.best_before_date,
+                  is_aggregated_amount: stock.is_aggregated_amount,
+                };
+              } else {
+                return {
+                  product_id: id,
+                  amount: 0,
+                  amount_aggregated: 0,
+                  in_stock: false,
+                };
+              }
+            });
+            
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  products_checked: productIds.length,
+                  results: results,
+                }, null, 2),
+              }],
+            };
+          }
+
+          case "get_recipe_with_stock_status": {
+            const recipeId = args.recipe_id as number;
+            const servings = (args.servings as number) || 1;
+            
+            // Get recipe details
+            const recipeResponse = await this.axiosInstance.get(`/objects/recipes/${recipeId}`);
+            const recipe = recipeResponse.data;
+            
+            // Get recipe ingredients
+            const ingredientsResponse = await this.axiosInstance.get("/objects/recipes_pos");
+            const ingredients = ingredientsResponse.data.filter((i: any) => i.recipe_id === recipeId);
+            
+            // Get products for names
+            const productsResponse = await this.axiosInstance.get("/objects/products");
+            const productMap = new Map(productsResponse.data.map((p: any) => [p.id, p]));
+            
+            // Get current stock
+            const stockResponse = await this.axiosInstance.get("/stock");
+            const stockMap = new Map(stockResponse.data.map((s: any) => [s.product_id, s.amount_aggregated]));
+            
+            // Calculate fulfillment
+            const ingredientStatus = ingredients.map((i: any) => {
+              const product = productMap.get(i.product_id) as any;
+              const neededAmount = i.amount * servings;
+              const stockAmount = (stockMap.get(i.product_id) as number) || 0;
+              const fulfilled = stockAmount >= neededAmount;
+              const missing = Math.max(0, neededAmount - stockAmount);
+              
+              return {
+                product_id: i.product_id,
+                product_name: product?.name || "Unknown",
+                amount_needed: neededAmount,
+                amount_in_stock: stockAmount,
+                fulfilled: fulfilled,
+                missing: missing,
+                note: i.note || "",
+              };
+            });
+            
+            const allFulfilled = ingredientStatus.every((i: any) => i.fulfilled);
+            const totalMissing = ingredientStatus.filter((i: any) => !i.fulfilled).length;
+            
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  recipe_id: recipeId,
+                  recipe_name: recipe.name,
+                  servings: servings,
+                  can_make: allFulfilled,
+                  missing_ingredients_count: totalMissing,
+                  ingredients: ingredientStatus,
+                }, null, 2),
+              }],
+            };
+          }
+
+          case "bulk_add_to_shopping_list": {
+            const items = args.items as any[];
+            
+            const results: any[] = [];
+            for (const item of items) {
+              try {
+                const response = await this.axiosInstance.post("/objects/shopping_list", {
+                  product_id: item.product_id,
+                  shopping_list_id: 1,
+                  amount: item.amount,
+                  note: item.note || "",
+                });
+                results.push({
+                  product_id: item.product_id,
+                  amount: item.amount,
+                  status: "added",
+                  entry_id: response.data.created_object_id,
+                });
+              } catch (err: any) {
+                results.push({
+                  product_id: item.product_id,
+                  amount: item.amount,
+                  status: "failed",
+                  error: err.message,
+                });
+              }
+            }
+            
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  items_requested: items.length,
+                  items_added: results.filter(r => r.status === "added").length,
+                  items_failed: results.filter(r => r.status === "failed").length,
+                  details: results,
+                }, null, 2),
+              }],
             };
           }
 

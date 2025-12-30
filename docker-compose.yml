@@ -3,6 +3,8 @@ services:
     image: linuxserver/grocy:latest
     container_name: grocy
     environment:
+      - GROCY_CURRENCY=GBP
+      - GROCY_CULTURE=en_GB  # Optional: Sets date/number formatting to UK standards
       - PUID=1000
       - PGID=1000
       - TZ=Europe/London

@@ -223,6 +223,55 @@ Example:
 | `get_system_info` | Get Grocy system information |
 | `get_userfields` | Get custom user fields for an entity |
 
+### Bulk Operations & Smart Tools (6 tools)
+
+| Tool | Description |
+|------|-------------|
+| `create_recipe_with_ingredients` | Create a complete recipe with all ingredients in one call |
+| `add_recipe_missing_to_shopping_list` | Calculate missing ingredients and add to shopping list |
+| `match_product_by_name` | Fuzzy search products with confidence scores |
+| `bulk_get_stock` | Get stock levels for multiple products at once |
+| `get_recipe_with_stock_status` | Get recipe with detailed stock status per ingredient |
+| `bulk_add_to_shopping_list` | Add multiple items to shopping list in one call |
+
+### Generic Entity CRUD (4 tools)
+
+| Tool | Description |
+|------|-------------|
+| `create_entity` | Create any entity (products, locations, recipes, etc.) |
+| `update_entity` | Update an existing entity |
+| `delete_entity` | Delete an entity |
+| `get_entity` | Get a specific entity by ID |
+
+## Bulk Operations Examples
+
+### Create Recipe with Ingredients
+```json
+call create_recipe_with_ingredients {
+  "recipe": {"name": "Pale Ale", "description": "Classic American pale ale"},
+  "ingredients": [
+    {"product_id": 65, "amount": 3.88, "note": "Maris Otter"},
+    {"product_id": 74, "amount": 0.5, "note": "Crystal malt"}
+  ]
+}
+```
+
+### Smart Shopping List from Recipe
+```json
+call add_recipe_missing_to_shopping_list {"recipe_id": 17, "servings": 2}
+```
+
+### Fuzzy Product Matching
+```json
+call match_product_by_name {"name": "Golden Promise", "fuzzy": true}
+// Returns matches with confidence scores
+```
+
+### Bulk Stock Check
+```json
+call bulk_get_stock {"product_ids": [65, 74, 12, 17, 75]}
+```
+
 ## Development
 
 ### Project Structure
@@ -329,3 +378,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Grocy GitHub](https://github.com/grocy/grocy)
 - [MCP Documentation](https://modelcontextprotocol.io/docs)
 - [MCP SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+- [BeerSmith MCP Server](https://github.com/johndoyle/BeerSmith-MCP-Server) - Integrate with BeerSmith recipes
+
+## Integration Guides
+
+- **[BeerSmith + Grocy Integration](docs/BEERSMITH_INTEGRATION.md)** - Complete guide for managing brewing ingredients and recipes using both MCP servers together
