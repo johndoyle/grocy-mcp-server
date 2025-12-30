@@ -415,7 +415,7 @@ class GrocyMCPServer {
         // Bulk Operations & Smart Tools
         {
           name: "create_recipe_with_ingredients",
-          description: "Create a complete recipe with all ingredients in a single operation",
+          description: "Create a complete recipe with all ingredients in a single operation. Supports automatic unit conversion when source_unit is specified (e.g., from grams to kg).",
           inputSchema: {
             type: "object",
             properties: {
@@ -436,12 +436,16 @@ class GrocyMCPServer {
                   type: "object",
                   properties: {
                     product_id: { type: "number", description: "Product ID" },
-                    amount: { type: "number", description: "Amount needed" },
+                    amount: { type: "number", description: "Amount needed in source_unit (or product's stock unit if source_unit not specified)" },
                     note: { type: "string", description: "Optional note" },
                     only_check_single_unit_in_stock: { type: "boolean", description: "Check single unit only" },
                   },
                   required: ["product_id", "amount"],
                 },
+              },
+              source_unit: {
+                type: "string",
+                description: "Optional: Unit that amounts are provided in (e.g., 'g', 'gram', 'grams'). If specified, amounts will be converted to each product's stock unit.",
               },
             },
             required: ["recipe", "ingredients"],
@@ -921,6 +925,19 @@ class GrocyMCPServer {
           case "create_recipe_with_ingredients": {
             const recipeData = args.recipe as any;
             const ingredients = args.ingredients as any[];
+            const sourceUnit = args.source_unit as string | undefined;
+            
+            // If source_unit is specified, fetch products and units for conversion
+            let productMap: Map<number, any> | undefined;
+            let unitsMap: Map<number, any> | undefined;
+            
+            if (sourceUnit) {
+              const productsResponse = await this.axiosInstance.get("/objects/products");
+              productMap = new Map(productsResponse.data.map((p: any) => [p.id, p]));
+              
+              const unitsResponse = await this.axiosInstance.get("/objects/quantity_units");
+              unitsMap = new Map(unitsResponse.data.map((u: any) => [u.id, u]));
+            }
             
             // Create the recipe first
             const recipePayload: any = {
@@ -932,19 +949,70 @@ class GrocyMCPServer {
             const recipeResponse = await this.axiosInstance.post("/objects/recipes", recipePayload);
             const recipeId = recipeResponse.data.created_object_id;
             
-            // Add all ingredients
+            // Add all ingredients (with conversion if needed)
             const ingredientResults: any[] = [];
             for (const ingredient of ingredients) {
               try {
+                let finalAmount = ingredient.amount;
+                let conversionNote = "";
+                
+                // Perform unit conversion if source_unit is specified
+                if (sourceUnit && productMap && unitsMap) {
+                  const product = productMap.get(ingredient.product_id);
+                  if (!product) {
+                    ingredientResults.push({
+                      product_id: ingredient.product_id,
+                      status: "failed",
+                      error: "Product not found",
+                    });
+                    continue;
+                  }
+                  
+                  const stockUnit = unitsMap.get(product.qu_id_stock) as any;
+                  const sourceUnitLower = sourceUnit.toLowerCase();
+                  
+                  if (stockUnit) {
+                    const stockUnitLower = stockUnit.name.toLowerCase();
+                    
+                    // Convert from source unit to stock unit
+                    if ((sourceUnitLower === "g" || sourceUnitLower === "gram" || sourceUnitLower === "grams") &&
+                        (stockUnitLower === "kg" || stockUnitLower === "kilogram" || stockUnitLower === "kilograms")) {
+                      finalAmount = ingredient.amount / 1000;
+                      conversionNote = ` (${ingredient.amount}g → ${finalAmount}kg)`;
+                    } else if ((sourceUnitLower === "g" || sourceUnitLower === "gram" || sourceUnitLower === "grams") &&
+                               (stockUnitLower === "g" || stockUnitLower === "gram" || stockUnitLower === "grams")) {
+                      finalAmount = ingredient.amount;
+                      conversionNote = ` (${ingredient.amount}g)`;
+                    } else if ((sourceUnitLower === "g" || sourceUnitLower === "gram" || sourceUnitLower === "grams") &&
+                               (stockUnitLower === "oz" || stockUnitLower === "ounce" || stockUnitLower === "ounces")) {
+                      finalAmount = ingredient.amount / 28.3495;
+                      conversionNote = ` (${ingredient.amount}g → ${finalAmount.toFixed(2)}oz)`;
+                    } else if ((sourceUnitLower === "g" || sourceUnitLower === "gram" || sourceUnitLower === "grams") &&
+                               (stockUnitLower === "lb" || stockUnitLower === "pound" || stockUnitLower === "pounds")) {
+                      finalAmount = ingredient.amount / 453.592;
+                      conversionNote = ` (${ingredient.amount}g → ${finalAmount.toFixed(2)}lb)`;
+                    } else {
+                      // No conversion performed
+                      conversionNote = ` (no conversion: ${sourceUnit} → ${stockUnit.name})`;
+                    }
+                  }
+                }
+                
                 const ingredientPayload = {
                   recipe_id: recipeId,
                   product_id: ingredient.product_id,
-                  amount: ingredient.amount,
-                  note: ingredient.note || "",
+                  amount: finalAmount,
+                  note: `${ingredient.note || ""}${conversionNote}`.trim(),
                   only_check_single_unit_in_stock: ingredient.only_check_single_unit_in_stock || false,
                 };
+                
                 await this.axiosInstance.post("/objects/recipes_pos", ingredientPayload);
-                ingredientResults.push({ product_id: ingredient.product_id, status: "added" });
+                
+                const result: any = { product_id: ingredient.product_id, status: "added" };
+                if (conversionNote) {
+                  result.conversion = conversionNote.trim();
+                }
+                ingredientResults.push(result);
               } catch (err: any) {
                 ingredientResults.push({ product_id: ingredient.product_id, status: "failed", error: err.message });
               }
