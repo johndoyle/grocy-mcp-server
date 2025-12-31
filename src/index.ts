@@ -526,6 +526,25 @@ class GrocyMCPServer {
             required: ["items"],
           },
         },
+
+        // BeerSmith Integration
+        {
+          name: "list_brewing_ingredients",
+          description: "Export brewing ingredients with pricing data for BeerSmith integration. Returns products with name, price, quantity unit, and product group.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              product_group_filter: {
+                type: "string",
+                description: "Optional: Filter by product group name (e.g., 'Brewing', 'Hops', 'Grains')",
+              },
+              include_all_products: {
+                type: "boolean",
+                description: "If true, include all products. If false (default), only include products with pricing data.",
+              },
+            },
+          },
+        },
       ],
     }));
 
@@ -1279,6 +1298,92 @@ class GrocyMCPServer {
                   items_added: results.filter(r => r.status === "added").length,
                   items_failed: results.filter(r => r.status === "failed").length,
                   details: results,
+                }, null, 2),
+              }],
+            };
+          }
+
+          // BeerSmith Integration
+          case "list_brewing_ingredients": {
+            const productGroupFilter = args.product_group_filter as string | undefined;
+            const includeAll = args.include_all_products as boolean | undefined;
+            
+            // Get all products
+            const productsResponse = await this.axiosInstance.get("/objects/products");
+            const products = productsResponse.data;
+            
+            // Get quantity units for unit names
+            const unitsResponse = await this.axiosInstance.get("/objects/quantity_units");
+            const unitsMap = new Map(unitsResponse.data.map((u: any) => [u.id, u]));
+            
+            // Get product groups for categorization
+            const groupsResponse = await this.axiosInstance.get("/objects/product_groups");
+            const groupsMap = new Map(groupsResponse.data.map((g: any) => [g.id, g]));
+            
+            // Get stock entries to find last purchase prices
+            const stockResponse = await this.axiosInstance.get("/stock");
+            const stockMap = new Map(stockResponse.data.map((s: any) => [s.product_id, s]));
+            
+            // Format ingredients for BeerSmith
+            const ingredients: any[] = [];
+            
+            for (const product of products) {
+              // Apply product group filter if specified
+              if (productGroupFilter) {
+                const productGroup = groupsMap.get(product.product_group_id) as any;
+                if (!productGroup || !productGroup.name.toLowerCase().includes(productGroupFilter.toLowerCase())) {
+                  continue;
+                }
+              }
+              
+              // Get stock info for pricing
+              const stockInfo = stockMap.get(product.id) as any;
+              const lastPrice = stockInfo?.last_price || product.default_best_before_days_after_open || 0;
+              
+              // Skip products without prices unless includeAll is true
+              if (!includeAll && !lastPrice) {
+                continue;
+              }
+              
+              // Get quantity unit name
+              const unit = unitsMap.get(product.qu_id_stock) as any;
+              const unitName = unit?.name || "unit";
+              
+              // Get product group for categorization
+              const productGroup = groupsMap.get(product.product_group_id) as any;
+              let productGroupHint = "";
+              
+              // Map Grocy product groups to BeerSmith categories
+              if (productGroup) {
+                const groupNameLower = productGroup.name.toLowerCase();
+                if (groupNameLower.includes("hop")) {
+                  productGroupHint = "hops";
+                } else if (groupNameLower.includes("grain") || groupNameLower.includes("malt") || groupNameLower.includes("ferment")) {
+                  productGroupHint = "grain";
+                } else if (groupNameLower.includes("yeast")) {
+                  productGroupHint = "yeast";
+                } else if (groupNameLower.includes("misc") || groupNameLower.includes("additive") || groupNameLower.includes("other")) {
+                  productGroupHint = "misc";
+                } else {
+                  productGroupHint = productGroup.name.toLowerCase();
+                }
+              }
+              
+              ingredients.push({
+                name: product.name,
+                price: parseFloat(lastPrice) || 0,
+                qu_id: unitName,
+                product_group: productGroupHint || "other",
+                product_id: product.id, // Include for reference/debugging
+              });
+            }
+            
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  count: ingredients.length,
+                  ingredients: ingredients,
                 }, null, 2),
               }],
             };

@@ -2,3 +2,4 @@ build/
 grocy-data/
 node_modules/
 .env
+.vscode/

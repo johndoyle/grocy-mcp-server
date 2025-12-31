@@ -243,6 +243,12 @@ Example:
 | `delete_entity` | Delete an entity |
 | `get_entity` | Get a specific entity by ID |
 
+### BeerSmith Integration (1 tool)
+
+| Tool | Description |
+|------|-------------|
+| `list_brewing_ingredients` | Export brewing ingredients with pricing for BeerSmith price sync |
+
 ## Bulk Operations Examples
 
 ### Create Recipe with Ingredients
@@ -270,6 +276,23 @@ call match_product_by_name {"name": "Golden Promise", "fuzzy": true}
 ### Bulk Stock Check
 ```json
 call bulk_get_stock {"product_ids": [65, 74, 12, 17, 75]}
+```
+
+### BeerSmith Price Sync
+Export brewing ingredients with pricing data for sync with BeerSmith:
+```json
+call list_brewing_ingredients {"product_group_filter": "Brewing"}
+// Returns products with name, price, quantity unit, and product group
+```
+
+Filter by specific categories:
+```json
+call list_brewing_ingredients {"product_group_filter": "Hops"}
+```
+
+Include all products regardless of pricing:
+```json
+call list_brewing_ingredients {"include_all_products": true}
 ```
 
 ## Development

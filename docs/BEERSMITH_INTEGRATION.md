@@ -239,6 +239,73 @@ If recipe creation fails:
 2. Check ingredient amounts are numeric
 3. Ensure base_servings is set (default: 1)
 
+## Price Sync Workflow
+
+The BeerSmith MCP Server includes a `sync_prices_from_grocy` tool that can bulk-update ingredient prices from Grocy.
+
+### Step 1: Export brewing ingredients from Grocy
+```
+grocy:list_brewing_ingredients {"product_group_filter": "Brewing"}
+```
+
+This returns ingredients with pricing data:
+```json
+{
+  "count": 15,
+  "ingredients": [
+    {
+      "name": "Cascade Hops 2024",
+      "price": 2.50,
+      "qu_id": "oz",
+      "product_group": "hops",
+      "product_id": 12
+    },
+    {
+      "name": "Pilsner Malt",
+      "price": 1.89,
+      "qu_id": "lb",
+      "product_group": "grain",
+      "product_id": 65
+    }
+  ]
+}
+```
+
+### Step 2: Preview price updates in BeerSmith
+```
+beersmith:sync_prices_from_grocy {
+  "ingredients": [/* paste from step 1 */],
+  "dry_run": true
+}
+```
+
+This shows which ingredients will be matched and updated.
+
+### Step 3: Apply price updates
+```
+beersmith:sync_prices_from_grocy {
+  "ingredients": [/* paste from step 1 */],
+  "dry_run": false
+}
+```
+
+### Filter by specific categories
+Export only hops:
+```
+grocy:list_brewing_ingredients {"product_group_filter": "Hops"}
+```
+
+Export only grains:
+```
+grocy:list_brewing_ingredients {"product_group_filter": "Grain"}
+```
+
+### Tips for better matching
+- Keep product names close to BeerSmith conventions
+- Use Grocy product groups: "Hops", "Grains", "Yeast", "Brewing"
+- The `product_group` field improves matching accuracy
+- Review dry_run results before applying updates
+
 ## Example: Complete Brew Day Workflow
 
 ```bash
