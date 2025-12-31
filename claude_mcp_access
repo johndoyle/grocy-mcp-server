@@ -3,7 +3,7 @@
     "grocy": {
       "command": "ssh",
       "args": [
-        "john@192.168.24.24",
+        "USERNAME@SERVERIP",
         "docker",
         "exec",
         "-i",
