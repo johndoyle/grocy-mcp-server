@@ -1320,7 +1320,8 @@ class GrocyMCPServer {
             const groupsResponse = await this.axiosInstance.get("/objects/product_groups");
             const groupsMap = new Map(groupsResponse.data.map((g: any) => [g.id, g]));
             
-            // Get stock entries to find last purchase prices
+            // Get current stock with pricing information
+            // The /stock endpoint includes product details and last_price
             const stockResponse = await this.axiosInstance.get("/stock");
             const stockMap = new Map(stockResponse.data.map((s: any) => [s.product_id, s]));
             
@@ -1337,11 +1338,25 @@ class GrocyMCPServer {
               }
               
               // Get stock info for pricing
+              // The /stock endpoint doesn't include last_price directly,
+              // but it has a 'value' field (total stock value = quantity × price per unit)
+              // We can calculate price per unit as: value / amount
               const stockInfo = stockMap.get(product.id) as any;
-              const lastPrice = stockInfo?.last_price || product.default_best_before_days_after_open || 0;
-              
-              // Skip products without prices unless includeAll is true
-              if (!includeAll && !lastPrice) {
+              let priceValue = 0;
+              let hasStockInfo = false;
+
+              if (stockInfo && stockInfo.amount_aggregated) {
+                hasStockInfo = true;
+                if (stockInfo.value) {
+                  // Calculate price per unit from total value and quantity
+                  priceValue = parseFloat(stockInfo.value) / parseFloat(stockInfo.amount_aggregated);
+                }
+                // If value is 0 or missing, priceValue stays 0 (which is valid - free or no price set)
+              }
+
+              // Skip products that have no stock info at all, unless includeAll is true
+              // Products with stock but price 0 are included (they might be free or price not set)
+              if (!includeAll && !hasStockInfo) {
                 continue;
               }
               
@@ -1371,10 +1386,10 @@ class GrocyMCPServer {
               
               ingredients.push({
                 name: product.name,
-                price: parseFloat(lastPrice) || 0,
+                price: priceValue,
                 qu_id: unitName,
                 product_group: productGroupHint || "other",
-                product_id: product.id, // Include for reference/debugging
+                product_id: product.id,
               });
             }
             
