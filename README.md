@@ -143,16 +143,47 @@ npm start
 
 ## Connecting to Claude Desktop
 
-Once your MCP server is running, connect it to Claude Desktop.
+Claude Desktop automatically manages the MCP server lifecycle - **you don't need to manually start or stop the server**. Simply add the configuration below, and Claude Desktop will:
+
+1. **Automatically start** the server when Claude Desktop launches
+2. **Keep it running** via stdio connection as long as Claude is open
+3. **Automatically stop** the server when you quit Claude Desktop
 
 **Configuration file location:**
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 - **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
+### For Local Installation (Recommended)
+
+This is the simplest setup - Claude Desktop manages everything automatically:
+
+```json
+{
+  "mcpServers": {
+    "grocy": {
+      "command": "node",
+      "args": ["/absolute/path/to/grocy-mcp-server/build/index.js"],
+      "env": {
+        "GROCY_BASE_URL": "http://localhost:9283/api",
+        "GROCY_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+**Replace:**
+- `/absolute/path/to/grocy-mcp-server` with your actual project path
+- `your_api_key_here` with your Grocy API key
+- `http://localhost:9283/api` with your Grocy URL if different
+
+**Note:** The `start-mcp.sh` script is **not needed** for Claude Desktop integration. That script is only for manual testing or running the server as a standalone background service.
+
 ### For Docker Installation (via SSH)
 
-**Add to your config:**
+If your Grocy and MCP server are running in Docker on a remote machine:
+
 ```json
 {
   "mcpServers": {
@@ -174,37 +205,21 @@ Once your MCP server is running, connect it to Claude Desktop.
 
 Replace `user@hostname` with your server details. Ensure you have passwordless SSH configured (SSH keys).
 
-### For Local Installation
-
-```json
-{
-  "mcpServers": {
-    "grocy": {
-      "command": "node",
-      "args": ["/absolute/path/to/grocy-mcp-server/build/index.js"],
-      "env": {
-        "GROCY_BASE_URL": "http://your-grocy:port/api",
-        "GROCY_API_KEY": "your_api_key_here"
-      }
-    }
-  }
-}
-```
-
 ### Testing the Connection
 
 After configuring Claude Desktop:
 
-1. Restart Claude Desktop
-2. Start a new conversation
-3. Ask Claude: "Can you list my Grocy products?"
-4. Claude should connect to the MCP server and return your products
+1. **Build your project** (if not already done): `npm run build`
+2. **Restart Claude Desktop** - it will automatically start the MCP server
+3. Start a new conversation
+4. Ask Claude: "Can you list my Grocy products?"
+5. Claude should connect to the MCP server and return your products
 
 If connection fails, check:
-- MCP server is running: `docker ps | grep grocy-mcp-server`
-- Logs for errors: `docker logs grocy-mcp-server`
-- SSH connection works (for Method 1)
+- Build directory exists: `ls build/index.js`
 - API key is correct
+- Grocy URL is accessible from your machine
+- Check Claude Desktop logs for MCP errors (in Claude Desktop → Settings → Developer)
 
 ## Available Tools
 
