@@ -118,16 +118,8 @@ npm run build
 
 3. **Run:**
 ```bash
-# Stdio mode
 GROCY_BASE_URL="http://your-grocy:port/api" \
 GROCY_API_KEY="your_key" \
-npm start
-
-# HTTP/SSE mode
-GROCY_BASE_URL="http://your-grocy:port/api" \
-GROCY_API_KEY="your_key" \
-TRANSPORT="http" \
-PORT="3000" \
 npm start
 ```
 
@@ -139,8 +131,6 @@ npm start
 |----------|-------------|---------|----------|
 | `GROCY_BASE_URL` | Grocy API base URL | `http://grocy:80/api` | No |
 | `GROCY_API_KEY` | Grocy API key | - | **Yes** |
-| `TRANSPORT` | Transport protocol (`stdio` or `http`) | `stdio` | No |
-| `PORT` | HTTP server port (when using `http` transport) | `3000` | No |
 
 ### Getting Your Grocy API Key
 
@@ -153,16 +143,14 @@ npm start
 
 ## Connecting to Claude Desktop
 
-Once your MCP server is running, connect it to Claude Desktop using one of these methods:
-
-### Method 1: Stdio via SSH (Recommended for Docker)
-
-This method works with the Docker container over SSH. Best for remote servers.
+Once your MCP server is running, connect it to Claude Desktop.
 
 **Configuration file location:**
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 - **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+### For Docker Installation (via SSH)
 
 **Add to your config:**
 ```json
@@ -186,9 +174,7 @@ This method works with the Docker container over SSH. Best for remote servers.
 
 Replace `user@hostname` with your server details. Ensure you have passwordless SSH configured (SSH keys).
 
-### Method 2: Local Stdio
-
-If running the MCP server locally (not in Docker):
+### For Local Installation
 
 ```json
 {
@@ -204,37 +190,6 @@ If running the MCP server locally (not in Docker):
   }
 }
 ```
-
-### Method 3: HTTP/SSE (Experimental)
-
-For direct HTTP connections without SSH:
-
-1. **Start the MCP server in HTTP mode:**
-```bash
-# Update .env or docker-compose.yml
-TRANSPORT=http
-PORT=3000
-
-# Restart container
-docker compose up -d
-```
-
-2. **Add to Claude Desktop config:**
-```json
-{
-  "mcpServers": {
-    "grocy": {
-      "url": "http://your-server-ip:3000/sse",
-      "transport": "sse"
-    }
-  }
-}
-```
-
-**HTTP Endpoints:**
-- SSE Stream: `http://localhost:3000/sse` (GET)
-- Messages: `http://localhost:3000/message` (POST)
-- Health Check: `http://localhost:3000/health` (GET)
 
 ### Testing the Connection
 
