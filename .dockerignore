@@ -1,0 +1,6 @@
+grocy-data
+.git
+.env
+*.log
+.vscode
+dev

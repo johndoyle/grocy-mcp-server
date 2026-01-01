@@ -26,50 +26,108 @@ The Model Context Protocol (MCP) is an open standard that enables AI assistants 
 
 ## Installation
 
-### Option 1: Docker Compose (Recommended)
+### Option 1: Docker with Grocy (Complete Setup)
 
-This repository includes a complete Docker Compose setup with both Grocy and the MCP server.
+This option installs both Grocy and the MCP server together. Perfect if you don't have Grocy yet.
 
-1. Clone the repository:
+1. **Clone the repository:**
 ```bash
 git clone https://github.com/johndoyle/grocy-mcp-server.git
 cd grocy-mcp-server
 ```
 
-2. Create a `.env` file with your Grocy API key:
-```bash
-echo "GROCY_API_KEY=your_api_key_here" > .env
-```
-
-3. Start the services:
+2. **Start the containers:**
 ```bash
 docker compose up -d
 ```
 
-### Option 2: Standalone Installation
+This will start:
+- **Grocy** on `http://localhost:9283`
+- **MCP Server** (stdio mode) ready for Claude Desktop
 
-If you have an existing Grocy instance:
+3. **Get your Grocy API key:**
+   - Open Grocy at `http://localhost:9283`
+   - Complete initial setup
+   - Navigate to **Manage API keys** (under user settings)
+   - Create a new API key and copy it
 
-1. Clone and install dependencies:
+4. **Configure the API key:**
+```bash
+echo "GROCY_API_KEY=your_api_key_here" > .env
+docker compose restart grocy-mcp-server
+```
+
+Your MCP server is now running and ready to connect to Claude Desktop (see [Connecting to Claude Desktop](#connecting-to-claude-desktop)).
+
+### Option 2: Docker without Grocy (Existing Grocy Instance)
+
+If you already have Grocy running elsewhere, install just the MCP server.
+
+1. **Clone the repository:**
+```bash
+git clone https://github.com/johndoyle/grocy-mcp-server.git
+cd grocy-mcp-server
+```
+
+2. **Build the Docker image:**
+```bash
+npm install
+npm run build
+docker build -t grocy-mcp-server:latest .
+```
+
+3. **Run the container:**
+```bash
+docker run -d \
+  --name grocy-mcp-server \
+  -e GROCY_BASE_URL="http://your-grocy-host:port/api" \
+  -e GROCY_API_KEY="your_api_key_here" \
+  -e TRANSPORT="stdio" \
+  grocy-mcp-server:latest
+```
+
+For HTTP/SSE mode, add port mapping:
+```bash
+docker run -d \
+  --name grocy-mcp-server \
+  -p 3000:3000 \
+  -e GROCY_BASE_URL="http://your-grocy-host:port/api" \
+  -e GROCY_API_KEY="your_api_key_here" \
+  -e TRANSPORT="http" \
+  -e PORT="3000" \
+  grocy-mcp-server:latest
+```
+
+Your MCP server is now running and ready to connect to Claude Desktop (see [Connecting to Claude Desktop](#connecting-to-claude-desktop)).
+
+### Option 3: Local Installation (Development)
+
+For development or if you prefer not to use Docker:
+
+1. **Clone and install:**
 ```bash
 git clone https://github.com/johndoyle/grocy-mcp-server.git
 cd grocy-mcp-server
 npm install
 ```
 
-2. Build the TypeScript code:
+2. **Build:**
 ```bash
 npm run build
 ```
 
-3. Set environment variables:
+3. **Run:**
 ```bash
-export GROCY_BASE_URL="http://your-grocy-host:port/api"
-export GROCY_API_KEY="your_api_key_here"
-```
+# Stdio mode
+GROCY_BASE_URL="http://your-grocy:port/api" \
+GROCY_API_KEY="your_key" \
+npm start
 
-4. Run the server:
-```bash
+# HTTP/SSE mode
+GROCY_BASE_URL="http://your-grocy:port/api" \
+GROCY_API_KEY="your_key" \
+TRANSPORT="http" \
+PORT="3000" \
 npm start
 ```
 
@@ -81,6 +139,8 @@ npm start
 |----------|-------------|---------|----------|
 | `GROCY_BASE_URL` | Grocy API base URL | `http://grocy:80/api` | No |
 | `GROCY_API_KEY` | Grocy API key | - | **Yes** |
+| `TRANSPORT` | Transport protocol (`stdio` or `http`) | `stdio` | No |
+| `PORT` | HTTP server port (when using `http` transport) | `3000` | No |
 
 ### Getting Your Grocy API Key
 
@@ -91,29 +151,20 @@ npm start
 
 **Important**: If your Grocy instance is behind Home Assistant ingress, use the **local network URL** (e.g., `http://grocy:80/api` or `http://192.168.x.x:port/api`) instead of the ingress URL. The ingress authentication is only for browser sessions.
 
-## Usage
+## Connecting to Claude Desktop
 
-### With Claude Desktop
+Once your MCP server is running, connect it to Claude Desktop using one of these methods:
 
-Add the following to your Claude Desktop MCP configuration file:
+### Method 1: Stdio via SSH (Recommended for Docker)
 
-**Local Setup:**
-```json
-{
-  "mcpServers": {
-    "grocy": {
-      "command": "node",
-      "args": ["/path/to/grocy-mcp-server/build/index.js"],
-      "env": {
-        "GROCY_BASE_URL": "http://your-grocy-host:port/api",
-        "GROCY_API_KEY": "your_api_key_here"
-      }
-    }
-  }
-}
-```
+This method works with the Docker container over SSH. Best for remote servers.
 
-**Remote Docker Setup (via SSH):**
+**Configuration file location:**
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+**Add to your config:**
 ```json
 {
   "mcpServers": {
@@ -133,25 +184,72 @@ Add the following to your Claude Desktop MCP configuration file:
 }
 ```
 
-### With VS Code (Development Client)
+Replace `user@hostname` with your server details. Ensure you have passwordless SSH configured (SSH keys).
 
-This repository includes an interactive development client for testing:
+### Method 2: Local Stdio
 
-1. Edit `.vscode/launch.json` with your SSH/Docker details
-2. Open the Run view in VS Code
-3. Select **Run MCP SSH Client** and start debugging
-4. Use the interactive REPL:
-   - `list` - List all available tools
-   - `call <toolName> <jsonArgs>` - Call a tool
-   - `help` - Show available commands
-   - `exit` - Close the client
+If running the MCP server locally (not in Docker):
 
-Example:
+```json
+{
+  "mcpServers": {
+    "grocy": {
+      "command": "node",
+      "args": ["/absolute/path/to/grocy-mcp-server/build/index.js"],
+      "env": {
+        "GROCY_BASE_URL": "http://your-grocy:port/api",
+        "GROCY_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
 ```
-> list
-> call get_products {}
-> call add_product {"product_id": 5, "amount": 2}
+
+### Method 3: HTTP/SSE (Experimental)
+
+For direct HTTP connections without SSH:
+
+1. **Start the MCP server in HTTP mode:**
+```bash
+# Update .env or docker-compose.yml
+TRANSPORT=http
+PORT=3000
+
+# Restart container
+docker compose up -d
 ```
+
+2. **Add to Claude Desktop config:**
+```json
+{
+  "mcpServers": {
+    "grocy": {
+      "url": "http://your-server-ip:3000/sse",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+**HTTP Endpoints:**
+- SSE Stream: `http://localhost:3000/sse` (GET)
+- Messages: `http://localhost:3000/message` (POST)
+- Health Check: `http://localhost:3000/health` (GET)
+
+### Testing the Connection
+
+After configuring Claude Desktop:
+
+1. Restart Claude Desktop
+2. Start a new conversation
+3. Ask Claude: "Can you list my Grocy products?"
+4. Claude should connect to the MCP server and return your products
+
+If connection fails, check:
+- MCP server is running: `docker ps | grep grocy-mcp-server`
+- Logs for errors: `docker logs grocy-mcp-server`
+- SSH connection works (for Method 1)
+- API key is correct
 
 ## Available Tools
 
@@ -296,6 +394,27 @@ call list_brewing_ingredients {"include_all_products": true}
 ```
 
 ## Development
+
+### Testing the MCP Server
+
+For development and testing, use the included interactive client:
+
+```bash
+npm run dev-client
+```
+
+This provides a REPL interface:
+- `list` - List all available tools
+- `call <toolName> <jsonArgs>` - Call a tool
+- `help` - Show available commands
+- `exit` - Close the client
+
+Example:
+```
+> list
+> call get_products {}
+> call add_product {"product_id": 5, "amount": 2}
+```
 
 ### Project Structure
 

@@ -1,10 +1,12 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import axios, { AxiosInstance } from "axios";
+import express from "express";
 
 interface GrocyConfig {
   baseUrl: string;
@@ -1421,10 +1423,85 @@ class GrocyMCPServer {
     });
   }
 
-  async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    console.error("Grocy MCP server running on stdio");
+  async run(transport: 'stdio' | 'http' = 'stdio', port: number = 3000) {
+    if (transport === 'stdio') {
+      const stdioTransport = new StdioServerTransport();
+      await this.server.connect(stdioTransport);
+      console.error("Grocy MCP server running on stdio");
+    } else {
+      await this.runHttpServer(port);
+    }
+  }
+
+  private async runHttpServer(port: number) {
+    const app = express();
+    app.use(express.json());
+
+    // Store active transports by session ID
+    const transports = new Map<string, SSEServerTransport>();
+
+    // SSE endpoint - establishes the event stream
+    app.get('/sse', async (req, res) => {
+      console.error('SSE connection established');
+      
+      const transport = new SSEServerTransport('/message', res);
+      await transport.start();
+      
+      // Store transport by session ID
+      transports.set(transport.sessionId, transport);
+      
+      transport.onclose = () => {
+        console.error(`SSE connection closed: ${transport.sessionId}`);
+        transports.delete(transport.sessionId);
+      };
+
+      transport.onerror = (error) => {
+        console.error(`SSE error: ${error.message}`);
+        transports.delete(transport.sessionId);
+      };
+
+      await this.server.connect(transport);
+    });
+
+    // Message endpoint - receives messages from client
+    app.post('/message', async (req, res) => {
+      const sessionId = req.headers['x-mcp-session-id'] as string;
+      
+      if (!sessionId) {
+        res.status(400).json({ error: 'Missing x-mcp-session-id header' });
+        return;
+      }
+
+      const transport = transports.get(sessionId);
+      if (!transport) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      try {
+        await transport.handlePostMessage(req, res);
+      } catch (error: any) {
+        console.error('Error handling message:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ error: error.message });
+        }
+      }
+    });
+
+    // Health check endpoint
+    app.get('/health', (req, res) => {
+      res.json({ 
+        status: 'ok', 
+        transport: 'http/sse',
+        activeSessions: transports.size 
+      });
+    });
+
+    app.listen(port, () => {
+      console.error(`Grocy MCP server running on HTTP/SSE at http://localhost:${port}`);
+      console.error(`SSE endpoint: http://localhost:${port}/sse`);
+      console.error(`Message endpoint: http://localhost:${port}/message`);
+    });
   }
 }
 
@@ -1442,8 +1519,16 @@ async function main() {
   
   console.error(`Using Grocy base URL: ${config.baseUrl}`);
 
+  const transport = (process.env.TRANSPORT || 'stdio') as 'stdio' | 'http';
+  const port = parseInt(process.env.PORT || '3000', 10);
+  
+  console.error(`Transport mode: ${transport}`);
+  if (transport === 'http') {
+    console.error(`HTTP port: ${port}`);
+  }
+
   const server = new GrocyMCPServer(config);
-  await server.run();
+  await server.run(transport, port);
 }
 
 main().catch((error) => {

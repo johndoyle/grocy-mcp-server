@@ -22,10 +22,14 @@ services:
     environment:
       - GROCY_BASE_URL=http://grocy:80/api
       - GROCY_API_KEY=${GROCY_API_KEY}
+      - TRANSPORT=${TRANSPORT:-stdio}
+      - PORT=3000
     depends_on:
       - grocy
     stdin_open: true
     tty: true
+    ports:
+      - "3000:3000"
     volumes:
       - ./src:/app/src
     restart: unless-stopped

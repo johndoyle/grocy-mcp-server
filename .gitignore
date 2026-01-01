@@ -3,3 +3,4 @@ grocy-data/
 node_modules/
 .env
 .vscode/
+.claude/

@@ -1,13 +1,12 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
-COPY . .
+# Copy package files and pre-installed dependencies
+COPY package*.json ./
+COPY node_modules ./node_modules
 
-RUN echo "Contents of /app:" && ls -la && \
-    echo "Running npm run build..." && \
-    npm run build && \
-    echo "Build completed. Contents of /app/build:" && \
-    ls -la build/
+# Copy pre-built files
+COPY build ./build
 
 CMD ["node", "build/index.js"]
