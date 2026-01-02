@@ -227,6 +227,17 @@ class GrocyMCPServer {
             required: ["entity", "object_id"],
           },
         },
+        {
+          name: "list_entities",
+          description: "List all entities of a given type. Useful for browsing available options like product groups, quantity units, locations, etc.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              entity: { type: "string", description: "Entity type (e.g., 'product_groups', 'quantity_units', 'shopping_locations', 'products', 'locations', 'recipes', 'chores', 'tasks', 'batteries')" },
+            },
+            required: ["entity"],
+          },
+        },
         
         // Shopping List
         {
@@ -732,6 +743,15 @@ class GrocyMCPServer {
             const objectId = args.object_id as number;
             
             const response = await this.axiosInstance.get(`/objects/${entity}/${objectId}`);
+            return {
+              content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }],
+            };
+          }
+
+          case "list_entities": {
+            const entity = args.entity as string;
+            
+            const response = await this.axiosInstance.get(`/objects/${entity}`);
             return {
               content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }],
             };
